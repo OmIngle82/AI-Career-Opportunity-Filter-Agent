@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchOpportunities, Opportunity, API_BASE_URL } from "@/lib/api";
 import OpportunityCard from "@/components/OpportunityCard";
 import AddSourceModal from "@/components/AddSourceModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2, RefreshCw, Plus, Settings, Bot } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
@@ -100,6 +101,8 @@ export default function Dashboard() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
+            <ThemeToggle />
+
             <Link 
               href="/profile"
               className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition-all border border-slate-200 dark:border-slate-700 shadow-sm flex-1 md:flex-none"

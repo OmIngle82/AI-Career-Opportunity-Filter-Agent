@@ -49,49 +49,49 @@ export default function AddSourceModal({ isOpen, onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800 w-full max-w-md p-6 relative">
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition-colors"
+          className="absolute top-4 right-4 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-2xl font-bold text-white mb-6">Add New Source</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Add New Source</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Source Name</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Source Name</label>
             <input 
               type="text" 
               required
               placeholder="e.g. Indeed India"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">URL or Identifier</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">URL or Identifier</label>
             <input 
               type="text" 
               required
               placeholder="https://..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Type</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Type</label>
               <select 
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-slate-900 dark:text-slate-100"
               >
                 <option value="WEB">Web Scraper</option>
                 <option value="TELEGRAM">Telegram</option>
@@ -99,11 +99,11 @@ export default function AddSourceModal({ isOpen, onClose, onSuccess }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Tier</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tier</label>
               <select 
                 value={tier}
                 onChange={(e) => setTier(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-slate-900 dark:text-slate-100"
               >
                 <option value="TIER_1_TRUSTED">Tier 1 (Trusted)</option>
                 <option value="TIER_2_GENERIC">Tier 2 (Generic)</option>
