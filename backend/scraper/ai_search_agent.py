@@ -3,7 +3,7 @@ import asyncio
 import httpx
 from typing import List
 from pydantic import BaseModel, Field
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from supabase import create_client
 from tenacity import retry, stop_after_attempt, wait_exponential

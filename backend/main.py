@@ -13,7 +13,7 @@ from models import OpportunityInput, OpportunityEvaluation, SourceInput, FormPre
 from services import extract_and_evaluate_opportunities, synthesize_directive, refine_directive
 import sys
 import subprocess
-import fitz # PyMuPDF
+import pymupdf as fitz # PyMuPDF
 from notifier import send_whatsapp_alert
 from scraper.ai_search_agent import run_agentic_search
 from scraper.telegram_listener import start_telegram_listener
