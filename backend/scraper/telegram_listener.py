@@ -140,7 +140,7 @@ async def start_telegram_listener():
     await client.connect()
     
     if not await client.is_user_authorized():
-        print("Telegram Listener: User is not authorized. Please run auth_telegram.py.")
+        print("Telegram Listener: User is not authorized. Please run scripts/loginScript.py or set TELEGRAM_SESSION_STRING.")
         await client.disconnect()
         return
 

@@ -2,7 +2,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from models import OpportunityEvaluation, ProfileSynthesis, OpportunityEvaluations
-from tenacity import retry, stop_after_attempt, wait_fixed, wait_exponential, retry_if_exception_type, retry_if_exception
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from langchain_google_genai.chat_models import GoogleAPIError
 from langchain_groq import ChatGroq
