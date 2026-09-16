@@ -5,3 +5,5 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
