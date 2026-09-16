@@ -4,6 +4,7 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from telethon.tl.types import MessageEntityTextUrl, MessageEntityUrl
 from supabase import create_client
 
@@ -122,12 +123,18 @@ async def start_telegram_listener():
         print("Telegram Listener: TELEGRAM_API_ID or TELEGRAM_API_HASH not set.")
         return
 
-    session_path = os.path.join(os.path.dirname(__file__), 'career_agent.session')
-    if not os.path.exists(session_path):
-        print(f"Telegram Listener: Session file not found at {session_path}.")
-        return
+    session_string = os.getenv("TELEGRAM_SESSION_STRING")
 
-    client = TelegramClient(os.path.join(os.path.dirname(__file__), 'career_agent'), API_ID, API_HASH)
+    if session_string:
+        # Cloud production mode
+        client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
+    else:
+        # Local development fallback
+        session_path = os.path.join(os.path.dirname(__file__), 'career_agent.session')
+        if not os.path.exists(session_path):
+            print(f"Telegram Listener: Session file not found at {session_path}.")
+            return
+        client = TelegramClient(os.path.join(os.path.dirname(__file__), 'career_agent'), API_ID, API_HASH)
     
     print("Telegram Listener: Starting daemon...")
     await client.connect()

@@ -38,11 +38,13 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     
     # Check for Telegram session and start listener
+    session_string = os.getenv("TELEGRAM_SESSION_STRING")
     session_path = os.path.join(os.path.dirname(__file__), "scraper", "career_agent.session")
-    if os.path.exists(session_path):
+    
+    if session_string or os.path.exists(session_path):
         asyncio.create_task(start_telegram_listener())
     else:
-        print("WARNING: Telegram ingestion disabled. Run 'auth_telegram.py' to authenticate.")
+        print("WARNING: Telegram ingestion disabled. Run 'loginScript.py' to authenticate or set TELEGRAM_SESSION_STRING.")
         
     yield
     scheduler.shutdown()
