@@ -78,3 +78,12 @@ CREATE TABLE ingestion_logs (
     message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- system_state table
+CREATE TABLE public.system_state (
+    id VARCHAR(255) PRIMARY KEY DEFAULT 'singleton',
+    last_sync_timestamp TIMESTAMP WITH TIME ZONE,
+    last_deep_crawl_timestamp TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);

@@ -21,6 +21,7 @@ from notifier import send_whatsapp_alert
 from scraper.ai_search_agent import run_agentic_search
 from scraper.telegram_listener import start_telegram_listener
 import asyncio
+from datetime import datetime, timezone
 
 def start_agentic_search_sync(user_id="default_user"):
     import asyncio
@@ -35,11 +36,6 @@ def run_scrapers_isolated():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(run_scrapers_isolated, 'cron', hour=9, minute=0)
-    scheduler.add_job(start_agentic_search_sync, 'cron', day_of_week='mon', hour=10, minute=0, args=['default_user'])
-    scheduler.start()
-    
     # Check for Telegram session and start listener
     session_string = os.getenv("TELEGRAM_SESSION_STRING")
     session_path = os.path.join(os.path.dirname(__file__), "scraper", "career_agent.session")
@@ -50,7 +46,6 @@ async def lifespan(app: FastAPI):
         print("WARNING: Telegram ingestion disabled. Run 'loginScript.py' to authenticate or set TELEGRAM_SESSION_STRING.")
         
     yield
-    scheduler.shutdown()
 
 app = FastAPI(title="AI Career Opportunity Filter API", lifespan=lifespan)
 
@@ -232,11 +227,51 @@ def get_opportunities():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.api_route("/health", methods=["GET", "HEAD"])
-def health_check():
+def health_check(background_tasks: BackgroundTasks):
     try:
         supabase = get_db()
         # Microscopic DB ping to reset Supabase's 7-day inactivity timer
         supabase.table('opportunities').select('id').limit(1).execute()
+        
+        # Stateful Autonomous Scheduling
+        try:
+            state_res = supabase.table('system_state').select('*').eq('id', 'singleton').execute()
+            
+            now = datetime.now(timezone.utc)
+            needs_sync = True
+            needs_crawl = True
+            
+            if state_res.data:
+                state = state_res.data[0]
+                last_sync = state.get('last_sync_timestamp')
+                last_crawl = state.get('last_deep_crawl_timestamp')
+                
+                if last_sync:
+                    last_sync_time = datetime.fromisoformat(last_sync)
+                    if (now - last_sync_time).total_seconds() < 24 * 3600:
+                        needs_sync = False
+                        
+                if last_crawl:
+                    last_crawl_time = datetime.fromisoformat(last_crawl)
+                    if (now - last_crawl_time).total_seconds() < 7 * 24 * 3600:
+                        needs_crawl = False
+            
+            if needs_sync or needs_crawl:
+                # Update the state immediately so concurrent health checks don't double-trigger
+                new_state = {'id': 'singleton'}
+                if needs_sync:
+                    new_state['last_sync_timestamp'] = now.isoformat()
+                    background_tasks.add_task(run_scrapers_isolated)
+                if needs_crawl:
+                    new_state['last_deep_crawl_timestamp'] = now.isoformat()
+                    background_tasks.add_task(start_agentic_search_sync, 'default_user')
+                    
+                supabase.table('system_state').upsert(new_state).execute()
+                
+        except Exception as e:
+            # If system_state table doesn't exist yet, ignore
+            pass
+            
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         # Return 500 if DB is unreachable so UptimeRobot alerts us
