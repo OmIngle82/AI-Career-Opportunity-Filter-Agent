@@ -17,14 +17,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 API_ID = os.environ.get("TELEGRAM_API_ID")
 API_HASH = os.environ.get("TELEGRAM_API_HASH")
 
-# Target channels (users can replace these with actual handles or links)
-TARGET_CHANNELS = [
-    'https://t.me/jobsinternshipswale', 
-    'https://t.me/goyalarsh',
-    'https://t.me/jobs_and_internships_updates',
-    'https://t.me/internfreak',
-    't.me/dummytestchannel1',
-]
+
 
 def get_db():
     supabase_url = os.environ.get("SUPABASE_URL")
@@ -144,9 +137,23 @@ async def start_telegram_listener():
         await client.disconnect()
         return
 
-    print(f"Telegram Listener: Successfully connected. Listening to channels: {TARGET_CHANNELS}")
+    # Fetch dynamic channels from database
+    db = get_db()
+    try:
+        response = db.table('sources').select('url_or_identifier').eq('source_type', 'TELEGRAM').execute()
+        dynamic_channels = [source['url_or_identifier'] for source in response.data]
+    except Exception as e:
+        print(f"Telegram Listener: Failed to fetch channels from DB: {e}")
+        dynamic_channels = []
+
+    if not dynamic_channels:
+        print("Telegram Listener: No Telegram sources found in the database. Exiting.")
+        await client.disconnect()
+        return
+
+    print(f"Telegram Listener: Successfully connected. Listening to channels: {dynamic_channels}")
     
-    @client.on(events.NewMessage(chats=TARGET_CHANNELS))
+    @client.on(events.NewMessage(chats=dynamic_channels))
     async def handler(event):
         msg = event.message
         text = msg.message
