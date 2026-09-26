@@ -134,9 +134,9 @@ def extract_and_evaluate_opportunities(raw_text: str, link_dict: str, profile: d
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
-            print("[Groq] Using hardcoded model: llama-3.3-70b-versatile")
+            print("[Groq] Using hardcoded model: llama-3.1-70b-versatile")
             groq_llm = ChatGroq(
-                model="llama-3.3-70b-versatile",
+                model="llama-3.1-70b-versatile",
                 api_key=groq_key,
                 temperature=0.1,
             )
