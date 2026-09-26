@@ -12,6 +12,7 @@ from supabase import create_client, Client
 from models import OpportunityInput, OpportunityEvaluation, SourceInput, FormPreferences
 from services import extract_and_evaluate_opportunities, synthesize_directive, refine_directive
 import sys
+import traceback
 import subprocess
 import pymupdf as fitz # PyMuPDF
 from notifier import send_whatsapp_alert
@@ -176,23 +177,28 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
 
 @app.get("/opportunities")
 def get_opportunities():
-    supabase = get_db()
-        
-    # Fetch all, sorted by match_score desc
-    result = supabase.table('opportunities').select('*').order('match_score', desc=True).execute()
-    
-    # Apply adaptive match filtering based on source_tier
-    filtered_opportunities = []
-    for opp in result.data:
-        tier = opp.get('source_tier', 'TIER_2_GENERIC')
-        score = opp.get('match_score', 0)
-        
-        if tier == 'TIER_1_TRUSTED' and score >= 10:
-            filtered_opportunities.append(opp)
-        elif tier == 'TIER_2_GENERIC' and score >= 10:
-            filtered_opportunities.append(opp)
+    try:
+        supabase = get_db()
             
-    return {"opportunities": filtered_opportunities}
+        # Fetch all, sorted by match_score desc
+        result = supabase.table('opportunities').select('*').order('match_score', desc=True).execute()
+        
+        # Apply adaptive match filtering based on source_tier
+        filtered_opportunities = []
+        for opp in result.data:
+            tier = opp.get('source_tier', 'TIER_2_GENERIC')
+            score = opp.get('match_score', 0)
+            
+            if tier == 'TIER_1_TRUSTED' and score >= 10:
+                filtered_opportunities.append(opp)
+            elif tier == 'TIER_2_GENERIC' and score >= 10:
+                filtered_opportunities.append(opp)
+                
+        return {"opportunities": filtered_opportunities}
+    except Exception as e:
+        print(f"\n[API ERROR] {traceback.format_exc()}\n")
+        print(f"Diagnostic - SUPABASE_URL present: {bool(os.getenv('SUPABASE_URL'))}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/sources")
 def create_source(source: SourceInput):
