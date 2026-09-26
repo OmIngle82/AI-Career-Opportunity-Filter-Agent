@@ -242,6 +242,18 @@ def get_opportunities():
         
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health_check():
+    try:
+        supabase = get_db()
+        # Microscopic DB ping to reset Supabase's 7-day inactivity timer
+        supabase.table('opportunities').select('id').limit(1).execute()
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        # Return 500 if DB is unreachable so UptimeRobot alerts us
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/sources")
 def create_source(source: SourceInput):
     supabase = get_db()
