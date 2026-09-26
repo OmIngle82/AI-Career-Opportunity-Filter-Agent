@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import os
+from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from supabase import create_client, Client
@@ -63,11 +64,24 @@ app.add_middleware(
 def get_db() -> Client:
     raw_url = os.getenv("SUPABASE_URL", "")
     raw_key = os.getenv("SUPABASE_KEY", "")
-    supabase_url = raw_url.strip()
-    supabase_key = raw_key.strip()
-    if not supabase_url or not supabase_key:
+
+    # Aggressive sanitization
+    clean_url = raw_url.strip().replace('"', '').replace("'", "")
+    clean_key = raw_key.strip().replace('"', '').replace("'", "")
+
+    if not clean_url or not clean_key:
         raise HTTPException(status_code=500, detail="Database credentials missing")
-    return create_client(supabase_url, supabase_key)
+
+    # Ensure it is a valid URL, fallback to HTTPS if missing
+    parsed_url = urlparse(clean_url)
+    if not parsed_url.scheme:
+        clean_url = f"https://{clean_url}"
+    elif parsed_url.scheme != 'https':
+        clean_url = clean_url.replace(parsed_url.scheme + "://", "https://")
+
+    print(f"Diagnostic - Cleaned URL host: {urlparse(clean_url).hostname}")
+
+    return create_client(clean_url, clean_key)
 
 @app.post("/evaluate")
 def evaluate_and_save(input_data: OpportunityInput, background_tasks: BackgroundTasks):
