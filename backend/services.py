@@ -134,24 +134,15 @@ def extract_and_evaluate_opportunities(raw_text: str, link_dict: str, profile: d
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
-            groq_client = Groq(api_key=groq_key)
-            available_models = groq_client.models.list().data
-            # Find the best Llama model dynamically (prefer 70b, then 3.1, then anything Llama)
-            valid_models = [m.id for m in available_models if "llama" in m.id.lower()]
-
-            if valid_models:
-                # Sort to prefer versatile/70b models if they exist
-                best_model = next((m for m in valid_models if "70b" in m), valid_models[0])
-                print(f"[Groq] Dynamically selected model: {best_model}")
-
-                groq_llm = ChatGroq(
-                    model=best_model,
-                    api_key=groq_key,
-                    temperature=0.1,
-                )
-                fallbacks_structured.append(groq_llm.with_structured_output(OpportunityEvaluations))
+            print("[Groq] Using hardcoded model: llama-3.3-70b-versatile")
+            groq_llm = ChatGroq(
+                model="llama-3.3-70b-versatile",
+                api_key=groq_key,
+                temperature=0.1,
+            )
+            fallbacks_structured.append(groq_llm.with_structured_output(OpportunityEvaluations))
         except Exception as e:
-            print(f"[Warning] Failed to dynamically fetch Groq models: {e}")
+            print(f"[Warning] Failed to initialize Groq client: {e}")
     else:
         print("[Warning] GROQ_API_KEY not found in environment. No fallbacks available.")
 
