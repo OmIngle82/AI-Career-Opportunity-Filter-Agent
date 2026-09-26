@@ -61,8 +61,10 @@ app.add_middleware(
 )
 
 def get_db() -> Client:
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY")
+    raw_url = os.getenv("SUPABASE_URL", "")
+    raw_key = os.getenv("SUPABASE_KEY", "")
+    supabase_url = raw_url.strip()
+    supabase_key = raw_key.strip()
     if not supabase_url or not supabase_key:
         raise HTTPException(status_code=500, detail="Database credentials missing")
     return create_client(supabase_url, supabase_key)
