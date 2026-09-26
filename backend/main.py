@@ -98,18 +98,7 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
     
     # 1. Fetch User Profile
     profile_response = supabase.table('user_profiles').select('*').eq('user_id', user_id).execute()
-    if not profile_response.data:
-        # Create a mock profile if not exists for testing
-        mock_profile = {
-            'user_id': user_id,
-            'goals': 'Looking for a high-paying software engineering role in product companies. Preferred Location: Pune, Maharashtra, India.',
-            'preferred_stipend_min': 50000,
-            'learning_focus': 'Full stack development, AI integration'
-        }
-        supabase.table('user_profiles').insert(mock_profile).execute()
-        profile_data = mock_profile
-    else:
-        profile_data = profile_response.data[0]
+    profile_data = profile_response.data[0] if profile_response.data else {}
         
     # 2. Fetch User Schedule
     schedule_response = supabase.table('user_schedules').select('*').eq('user_id', user_id).execute()
