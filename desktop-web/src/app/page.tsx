@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchOpportunities, Opportunity, API_BASE_URL } from "@/lib/api";
+import { fetchOpportunities, Opportunity, apiFetch } from "@/lib/api";
 import OpportunityCard from "@/components/OpportunityCard";
 import AddSourceModal from "@/components/AddSourceModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -9,6 +9,8 @@ import { Loader2, RefreshCw, Plus, Settings, Bot } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/AuthContext";
+import { LogOut } from "lucide-react";
 
 export default function Dashboard() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -18,11 +20,12 @@ export default function Dashboard() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { username, logout } = useAuth();
 
   const handleSync = async () => {
     setIsSyncing(true);
     toast.promise(
-      fetch(`${API_BASE_URL}/sync-sources`, { method: "POST" }).then(() => {
+      apiFetch(`/sync-sources`, { method: "POST" }).then(() => {
         setTimeout(() => {
           loadData();
           setIsSyncing(false);
@@ -40,7 +43,7 @@ export default function Dashboard() {
     setIsCrawling(true);
     toast.info('Agentic Deep Crawl initiated. This may take a few minutes...');
     try {
-      await fetch(`${API_BASE_URL}/search/run-agentic-search`, { method: "POST" });
+      await apiFetch(`/search/run-agentic-search`, { method: "POST" });
       toast.success('Deep Crawl complete!');
       loadData();
     } catch (e) {
@@ -133,6 +136,18 @@ export default function Dashboard() {
               {isCrawling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
               <span>Deep Crawl</span>
             </button>
+            <div className="hidden md:flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {username}
+              </span>
+              <button
+                onClick={logout}
+                className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </header>
 

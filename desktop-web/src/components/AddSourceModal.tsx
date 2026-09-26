@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { X, Plus, Loader2 } from "lucide-react";
 
 interface Props {
@@ -22,7 +22,7 @@ export default function AddSourceModal({ isOpen, onClose, onSuccess }: Props) {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/sources`, {
+      const res = await apiFetch(`/sources`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

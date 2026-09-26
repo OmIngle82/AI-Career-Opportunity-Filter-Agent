@@ -19,10 +19,34 @@ export interface Opportunity {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+// A wrapper for fetch that automatically adds auth headers and handles 401s
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+  
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (res.status === 401 && typeof window !== "undefined") {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }
+
+  return res;
+}
+
 export async function fetchOpportunities(): Promise<Opportunity[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/opportunities`, {
-      cache: "no-store", // disable caching for live data
+    const res = await apiFetch(`/opportunities`, {
+      cache: "no-store", 
       signal: AbortSignal.timeout(15000)
     });
     

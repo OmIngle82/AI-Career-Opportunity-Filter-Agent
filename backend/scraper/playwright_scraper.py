@@ -143,39 +143,50 @@ async def scrape_and_evaluate_url(page, url: str, source_name: str, source_tier:
 
 async def run_scrapers():
     db = get_db()
-    print("Fetching active web sources from API...", flush=True)
-    res = db.table('sources').select('*').eq('source_type', 'WEB').execute()
-    web_sources = res.data
-    
-    if not web_sources:
-        print("No WEB sources found in the database. Exiting.")
-        return
+    print("Fetching active users...", flush=True)
+    users_res = db.table('users').select('id').execute()
+    users = users_res.data
 
-    profile_res = db.table('user_profiles').select('*').eq('user_id', 'default_user').execute()
-    schedule_res = db.table('user_schedules').select('*').eq('user_id', 'default_user').execute()
-    
-    if not profile_res.data:
-        print("No default profile found.")
+    if not users:
+        print("No users found.")
         return
-        
-    profile = profile_res.data[0]
-    schedule = schedule_res.data
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        
-        for source in web_sources:
-            await scrape_and_evaluate_url(
-                page=page, 
-                url=source['url_or_identifier'], 
-                source_name=source['name'], 
-                source_tier=source['source_tier'],
-                profile=profile,
-                schedule=schedule
-            )
-            await asyncio.sleep(2.5) # Throttle loop
+
+        for user in users:
+            user_id = user['id']
+            print(f"--- Scraping for User: {user_id} ---", flush=True)
+
+            res = db.table('sources').select('*').eq('source_type', 'WEB').eq('user_id', user_id).execute()
+            web_sources = res.data
+            
+            if not web_sources:
+                print(f"No WEB sources for user {user_id}. Skipping.")
+                continue
+
+            profile_res = db.table('user_profiles').select('*').eq('user_id', user_id).execute()
+            schedule_res = db.table('user_schedules').select('*').eq('user_id', user_id).execute()
+            
+            if not profile_res.data:
+                print(f"No profile for user {user_id}. Skipping.")
+                continue
                 
+            profile = profile_res.data[0]
+            schedule = schedule_res.data
+
+            for source in web_sources:
+                await scrape_and_evaluate_url(
+                    page=page, 
+                    url=source['url_or_identifier'], 
+                    source_name=source['name'], 
+                    source_tier=source['source_tier'],
+                    profile=profile,
+                    schedule=schedule
+                )
+                await asyncio.sleep(2.5) # Throttle loop
+
         await browser.close()
         print("\nScraping completed.")
 

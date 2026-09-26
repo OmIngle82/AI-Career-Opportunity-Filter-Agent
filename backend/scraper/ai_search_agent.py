@@ -51,78 +51,88 @@ def search_duckduckgo(query: str):
         results = [r for r in ddgs.text(query, max_results=5)]
         return results
 
-async def run_agentic_search(user_id="default_user"):
-    print(f"Starting Agentic Search for user: {user_id}")
+async def run_agentic_search():
+    print("Starting Agentic Search for all users")
     db = get_db()
-    res = db.table('user_profiles').select('*').eq('user_id', user_id).execute()
+    users_res = db.table('users').select('id').execute()
+    users = users_res.data
     
-    if not res.data:
-        print("User profile not found.")
+    if not users:
+        print("No users found.")
         return
-        
-    profile = res.data[0]
-    directive = profile.get("ai_filter_directive")
-    preferences = profile.get("form_preferences", {})
-    
-    if not directive:
-        print("No AI directive found. Run compilation first.")
-        return
-        
-    try:
-        queries = generate_search_queries(directive, preferences)
-    except Exception as e:
-        print(f"Error generating queries (Quota/Retry exhausted): {e}")
-        queries = ["Software Engineer Pune", "Tech internships .gov.in"]
-        
-    print(f"Generated queries: {queries}")
-    
-    if not queries:
-        return
-        
-    schedule_res = db.table('user_schedules').select('*').eq('user_id', user_id).execute()
-    schedule = schedule_res.data
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        
-        for query in queries:
-            print(f"\nExecuting search: {query}")
+
+        for user in users:
+            user_id = user['id']
+            print(f"\n--- Agentic Search for User: {user_id} ---")
+            
+            res = db.table('user_profiles').select('*').eq('user_id', user_id).execute()
+            if not res.data:
+                print(f"User profile not found for {user_id}.")
+                continue
+                
+            profile = res.data[0]
+            directive = profile.get("ai_filter_directive")
+            preferences = profile.get("form_preferences", {})
+            
+            if not directive:
+                print(f"No AI directive found for {user_id}. Run compilation first.")
+                continue
+                
             try:
-                results = await asyncio.to_thread(search_duckduckgo, query)
+                queries = generate_search_queries(directive, preferences)
             except Exception as e:
-                print(f"Search failed for '{query}': {e}")
-                await asyncio.sleep(5)
+                print(f"Error generating queries (Quota/Retry exhausted): {e}")
+                queries = ["Software Engineer Pune", "Tech internships .gov.in"]
+                
+            print(f"Generated queries: {queries}")
+            
+            if not queries:
                 continue
                 
-            if not results:
-                print("No results found for this query.")
-                continue
-                
-            for result in results:
-                title = result.get("title", "")
-                url = result.get("href", "")
-                
-                if not url:
+            schedule_res = db.table('user_schedules').select('*').eq('user_id', user_id).execute()
+            schedule = schedule_res.data
+
+            for query in queries:
+                print(f"\nExecuting search: {query}")
+                try:
+                    results = await asyncio.to_thread(search_duckduckgo, query)
+                except Exception as e:
+                    print(f"Search failed for '{query}': {e}")
+                    await asyncio.sleep(5)
                     continue
                     
-                print(f"\nDeep Crawling search result: {title}")
-                try:
-                    await scrape_and_evaluate_url(
-                        page=page,
-                        url=url,
-                        source_name=f"Agentic Search: {query}",
-                        source_tier="TIER_2_GENERIC",
-                        profile=profile,
-                        schedule=schedule
-                    )
-                except Exception as e:
-                    print(f"Deep crawl failed for {url}: {e}")
+                if not results:
+                    print("No results found for this query.")
+                    continue
                     
-                await asyncio.sleep(2.5) # Throttle loop
-            
-            await asyncio.sleep(2.5) # Delay between DDG queries to prevent rate limits
-            
+                for result in results:
+                    title = result.get("title", "")
+                    url = result.get("href", "")
+                    
+                    if not url:
+                        continue
+                        
+                    print(f"\nDeep Crawling search result: {title}")
+                    try:
+                        await scrape_and_evaluate_url(
+                            page=page,
+                            url=url,
+                            source_name=f"Agentic Search: {query}",
+                            source_tier="TIER_2_GENERIC",
+                            profile=profile,
+                            schedule=schedule
+                        )
+                    except Exception as e:
+                        print(f"Deep crawl failed for {url}: {e}")
+                        
+                    await asyncio.sleep(2.5) # Throttle loop
+                
+                await asyncio.sleep(2.5) # Delay between DDG queries to prevent rate limits
+                
         await browser.close()
         print("\nAgentic search completed.")
 

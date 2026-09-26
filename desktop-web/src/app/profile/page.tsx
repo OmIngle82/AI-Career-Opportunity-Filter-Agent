@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { UploadCloud, Bot, Loader2, Sparkles, Check, Send, ArrowLeft } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { UploadCloud, Bot, Loader2, Sparkles, Check, Send, ArrowLeft, LogOut } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 
@@ -27,6 +28,7 @@ export default function ProfilePage() {
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { username, logout } = useAuth();
   
   const [synthesis, setSynthesis] = useState<{ summary: string[], directive: string }>({ summary: [], directive: "" });
   const [feedback, setFeedback] = useState("");
@@ -39,7 +41,7 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/profile`);
+      const res = await apiFetch(`/profile`);
       if (res.ok) {
         const data = await res.json();
         setPreferences(data.form_preferences || {
@@ -66,7 +68,7 @@ export default function ProfilePage() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/profile/upload-resume`, {
+      const res = await apiFetch(`/profile/upload-resume`, {
         method: "POST",
         body: formData
       });
@@ -92,7 +94,7 @@ export default function ProfilePage() {
     setIsSynthesizing(true);
     
     try {
-      const res = await fetch(`${API_BASE_URL}/profile/synthesize`, {
+      const res = await apiFetch(`/profile/synthesize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ preferences, resume_text: rawResumeText })
@@ -118,7 +120,7 @@ export default function ProfilePage() {
     setIsRefining(true);
     
     try {
-      const res = await fetch(`${API_BASE_URL}/profile/refine`, {
+      const res = await apiFetch(`/profile/refine`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -145,7 +147,7 @@ export default function ProfilePage() {
   const handleConfirmAndActivate = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/profile/save`, {
+      const res = await apiFetch(`/profile/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -184,7 +186,21 @@ export default function ProfilePage() {
             </Link>
             <span className="font-semibold text-slate-900 dark:text-slate-100 tracking-tight">AI Persona Compiler</span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <div className="hidden md:flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-3">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {username}
+              </span>
+              <button
+                onClick={logout}
+                className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </nav>
 

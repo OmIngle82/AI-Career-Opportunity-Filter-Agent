@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,8 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-          <Toaster position="bottom-right" richColors />
+          <AuthProvider>
+            {children}
+            <Toaster position="bottom-right" richColors />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

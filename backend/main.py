@@ -23,12 +23,16 @@ from scraper.telegram_listener import start_telegram_listener
 import asyncio
 from datetime import datetime, timezone
 
-def start_agentic_search_sync(user_id="default_user"):
+from auth import get_current_user, create_access_token, verify_password, get_password_hash
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordRequestForm
+
+def start_agentic_search_sync():
     import asyncio
     import sys
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    asyncio.run(run_agentic_search(user_id))
+    asyncio.run(run_agentic_search())
 
 def run_scrapers_isolated():
     scraper_path = os.path.join(os.path.dirname(__file__), "scraper", "playwright_scraper.py")
@@ -84,19 +88,55 @@ def get_db() -> Client:
 
     return create_client(clean_url, clean_key)
 
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+@app.post("/register")
+def register_user(user: UserCreate):
+    supabase = get_db()
+    
+    # Check existing
+    res = supabase.table('users').select('id').eq('username', user.username).execute()
+    if res.data:
+        raise HTTPException(status_code=400, detail="Username already registered")
+        
+    hashed_pw = get_password_hash(user.password)
+    
+    try:
+        new_user = supabase.table('users').insert({
+            'username': user.username,
+            'hashed_password': hashed_pw
+        }).execute()
+        return {"message": "User registered successfully", "user_id": new_user.data[0]['id']}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    supabase = get_db()
+    res = supabase.table('users').select('*').eq('username', form_data.username).execute()
+    
+    if not res.data:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        
+    user = res.data[0]
+    if not verify_password(form_data.password, user['hashed_password']):
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+        
+    access_token = create_access_token(data={"sub": user['id']})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.post("/evaluate")
-def evaluate_and_save(input_data: OpportunityInput, background_tasks: BackgroundTasks):
+def evaluate_and_save(input_data: OpportunityInput, background_tasks: BackgroundTasks, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
 
-    # Hardcoded default user for Phase 1
-    user_id = 'default_user'
-    
     # 1. Fetch User Profile
-    profile_response = supabase.table('user_profiles').select('*').eq('user_id', user_id).execute()
+    profile_response = supabase.table('user_profiles').select('*').eq('user_id', current_user_id).execute()
     profile_data = profile_response.data[0] if profile_response.data else {}
         
     # 2. Fetch User Schedule
-    schedule_response = supabase.table('user_schedules').select('*').eq('user_id', user_id).execute()
+    schedule_response = supabase.table('user_schedules').select('*').eq('user_id', current_user_id).execute()
     schedule_data = schedule_response.data
 
     # 3. Evaluate via LangChain + Gemini
@@ -124,6 +164,7 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
 
     # 4. Save to DB
     opportunity_record = {
+        'user_id': current_user_id,
         'title': evaluation.title,
         'company': evaluation.company,
         'description': evaluation.description,
@@ -146,13 +187,13 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
     
     # Step 1: Check by apply_url (if it exists)
     if input_data.apply_url:
-        existing_url = supabase.table('opportunities').select('id').eq('apply_url', input_data.apply_url).execute()
+        existing_url = supabase.table('opportunities').select('id').eq('user_id', current_user_id).eq('apply_url', input_data.apply_url).execute()
         if existing_url.data:
             is_duplicate = True
             
     # Step 2: Check by Title + Company (Fallback)
     if not is_duplicate:
-        existing_tc = supabase.table('opportunities').select('id').eq('title', evaluation.title).eq('company', evaluation.company).execute()
+        existing_tc = supabase.table('opportunities').select('id').eq('user_id', current_user_id).eq('title', evaluation.title).eq('company', evaluation.company).execute()
         if existing_tc.data:
             is_duplicate = True
             
@@ -164,7 +205,7 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
         # If it's a duplicate, we can still return a success message but don't insert
         print(f"Job '{evaluation.title}' at '{evaluation.company}' already exists. Skipping duplicate.")
         # Fetch the existing record to return
-        existing_record = supabase.table('opportunities').select('*').eq('title', evaluation.title).eq('company', evaluation.company).execute()
+        existing_record = supabase.table('opportunities').select('*').eq('user_id', current_user_id).eq('title', evaluation.title).eq('company', evaluation.company).execute()
         db_record = existing_record.data[0] if existing_record.data else opportunity_record
         
     # Trigger WhatsApp alert for high-match jobs
@@ -182,12 +223,12 @@ def evaluate_and_save(input_data: OpportunityInput, background_tasks: Background
     return {"message": "Successfully evaluated and saved", "evaluation": evaluation.model_dump(), "db_record": db_record}
 
 @app.get("/opportunities")
-def get_opportunities():
+def get_opportunities(current_user_id: str = Depends(get_current_user)):
     try:
         supabase = get_db()
             
         # Fetch all, sorted by match_score desc
-        result = supabase.table('opportunities').select('*').order('match_score', desc=True).execute()
+        result = supabase.table('opportunities').select('*').eq('user_id', current_user_id).order('match_score', desc=True).execute()
         
         # Apply adaptive match filtering based on source_tier
         filtered_opportunities = []
@@ -264,7 +305,7 @@ def health_check(background_tasks: BackgroundTasks):
                     background_tasks.add_task(run_scrapers_isolated)
                 if needs_crawl:
                     new_state['last_deep_crawl_timestamp'] = now.isoformat()
-                    background_tasks.add_task(start_agentic_search_sync, 'default_user')
+                    background_tasks.add_task(start_agentic_search_sync)
                     
                 supabase.table('system_state').upsert(new_state).execute()
                 
@@ -279,10 +320,11 @@ def health_check(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/sources")
-def create_source(source: SourceInput):
+def create_source(source: SourceInput, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
     
     source_record = {
+        'user_id': current_user_id,
         'name': source.name,
         'url_or_identifier': source.url_or_identifier,
         'source_type': source.source_type,
@@ -293,33 +335,34 @@ def create_source(source: SourceInput):
     return {"message": "Source created successfully", "source": db_result.data[0]}
 
 @app.get("/sources")
-def get_sources():
+def get_sources(current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
         
-    result = supabase.table('sources').select('*').execute()
+    result = supabase.table('sources').select('*').eq('user_id', current_user_id).execute()
     return {"sources": result.data}
 
 @app.delete("/sources/{source_id}")
-def delete_source(source_id: str):
+def delete_source(source_id: str, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
         
-    supabase.table('sources').delete().eq('id', source_id).execute()
+    supabase.table('sources').delete().eq('id', source_id).eq('user_id', current_user_id).execute()
     return {"message": "Source deleted successfully"}
 
 @app.post("/sync-sources")
-def sync_sources(background_tasks: BackgroundTasks):
+def sync_sources(background_tasks: BackgroundTasks, current_user_id: str = Depends(get_current_user)):
+    # Note: Triggering this manually will sync sources for all users in the background.
     background_tasks.add_task(run_scrapers_isolated)
     return {"message": "Sync started in background"}
 
 @app.post("/search/run-agentic-search")
-def run_agentic_search_endpoint(background_tasks: BackgroundTasks):
-    background_tasks.add_task(start_agentic_search_sync, 'default_user')
+def run_agentic_search_endpoint(background_tasks: BackgroundTasks, current_user_id: str = Depends(get_current_user)):
+    background_tasks.add_task(start_agentic_search_sync)
     return {"message": "Agentic search started in background"}
 
 @app.get("/profile")
-def get_profile():
+def get_profile(current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
-    res = supabase.table('user_profiles').select('*').eq('user_id', 'default_user').execute()
+    res = supabase.table('user_profiles').select('*').eq('user_id', current_user_id).execute()
     if res.data:
         profile = res.data[0]
         # Return structured format for UI
@@ -336,7 +379,7 @@ class SynthesizeInput(BaseModel):
     resume_text: str = ""
 
 @app.post("/profile/synthesize")
-def synthesize_profile(input_data: SynthesizeInput):
+def synthesize_profile(input_data: SynthesizeInput, current_user_id: str = Depends(get_current_user)):
     try:
         synthesis = synthesize_directive(input_data.preferences, input_data.resume_text)
         return synthesis
@@ -349,7 +392,7 @@ class RefineInput(BaseModel):
     feedback: str
 
 @app.post("/profile/refine")
-def refine_profile(input_data: RefineInput):
+def refine_profile(input_data: RefineInput, current_user_id: str = Depends(get_current_user)):
     try:
         synthesis = refine_directive(input_data.current_summary, input_data.current_directive, input_data.feedback)
         return synthesis
@@ -362,28 +405,45 @@ class SaveProfileInput(BaseModel):
     ai_filter_directive: str = ""
 
 @app.post("/profile/save")
-def save_profile(input_data: SaveProfileInput):
+def save_profile(input_data: SaveProfileInput, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
-    # Upsert profile for default user
-    record = {
-        'user_id': 'default_user',
-        'form_preferences': input_data.form_preferences,
-        'raw_resume_text': input_data.raw_resume_text,
-        'ai_filter_directive': input_data.ai_filter_directive
-    }
-    res = supabase.table('user_profiles').upsert(record, on_conflict='user_id').execute()
-    return {"message": "Profile saved successfully", "profile": res.data[0]}
+    # Check if profile exists
+    res = supabase.table('user_profiles').select('*').eq('user_id', current_user_id).execute()
+    
+    if res.data:
+        # Update existing
+        db_result = supabase.table('user_profiles').update({
+            'form_preferences': input_data.form_preferences,
+            'raw_resume_text': input_data.raw_resume_text,
+            'ai_filter_directive': input_data.ai_filter_directive,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }).eq('user_id', current_user_id).execute()
+    else:
+        # Insert new
+        db_result = supabase.table('user_profiles').insert({
+            'user_id': current_user_id,
+            'form_preferences': input_data.form_preferences,
+            'raw_resume_text': input_data.raw_resume_text,
+            'ai_filter_directive': input_data.ai_filter_directive
+        }).execute()
+    return {"message": "Profile saved successfully", "profile": db_result.data[0]}
 
 # Legacy endpoints (can be kept or removed, but keeping them to not break old UI if needed)
 @app.post("/profile")
-def update_profile(profile: dict):
+def update_profile(profile: dict, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
-    profile['user_id'] = 'default_user'
-    res = supabase.table('user_profiles').upsert(profile, on_conflict='user_id').execute()
-    return {"message": "Profile updated", "profile": res.data[0]}
+    res = supabase.table('user_profiles').select('*').eq('user_id', current_user_id).execute()
+    
+    if res.data:
+        db_result = supabase.table('user_profiles').update(profile).eq('user_id', current_user_id).execute()
+    else:
+        profile['user_id'] = current_user_id
+        db_result = supabase.table('user_profiles').insert(profile).execute()
+        
+    return {"message": "Profile updated", "profile": db_result.data[0]}
 
 @app.post("/profile/upload-resume")
-async def upload_resume(file: UploadFile = File(...)):
+async def upload_resume(file: UploadFile = File(...), current_user_id: str = Depends(get_current_user)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
@@ -396,10 +456,17 @@ async def upload_resume(file: UploadFile = File(...)):
             
         # Update user profile with extracted text
         supabase = get_db()
-        supabase.table('user_profiles').upsert({
-            'user_id': 'default_user',
-            'resume_text': text.strip()
-        }, on_conflict='user_id').execute()
+        res = supabase.table('user_profiles').select('*').eq('user_id', current_user_id).execute()
+        
+        if res.data:
+            supabase.table('user_profiles').update({
+                'resume_text': text.strip()
+            }).eq('user_id', current_user_id).execute()
+        else:
+            supabase.table('user_profiles').insert({
+                'user_id': current_user_id,
+                'resume_text': text.strip()
+            }).execute()
         
         return {"message": "Resume parsed successfully", "extracted_text": text.strip()}
     except Exception as e:
