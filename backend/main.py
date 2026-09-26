@@ -218,8 +218,28 @@ def get_opportunities():
                 
         return {"opportunities": filtered_opportunities}
     except Exception as e:
-        print(f"\n[API ERROR] {traceback.format_exc()}\n")
-        print(f"Diagnostic - SUPABASE_URL present: {bool(os.getenv('SUPABASE_URL'))}")
+        import sys
+        sys.stderr.write(f"\n[API ERROR] {traceback.format_exc()}\n")
+        
+        raw_url = os.getenv("SUPABASE_URL", "")
+        sys.stderr.write(f"Diagnostic - SUPABASE_URL raw length: {len(raw_url)}\n")
+        sys.stderr.write(f"Diagnostic - SUPABASE_URL raw repr: {repr(raw_url)}\n")
+        
+        # Reproduce the cleaning logic to show exactly what is being sent to the client
+        clean_url = re.sub(r'[^\x20-\x7E]', '', raw_url).strip().replace('"', '').replace("'", "")
+        domain_match = re.search(r'([a-zA-Z0-9-]+\.supabase\.co)', clean_url)
+        if domain_match:
+            clean_url = f"https://{domain_match.group(1)}"
+        else:
+            parsed_url = urlparse(clean_url)
+            if not parsed_url.scheme:
+                clean_url = f"https://{clean_url}"
+            elif parsed_url.scheme != 'https':
+                clean_url = clean_url.replace(parsed_url.scheme + "://", "https://")
+                
+        sys.stderr.write(f"Diagnostic - Clean URL given to client: {repr(clean_url)}\n")
+        sys.stderr.flush()
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/sources")
