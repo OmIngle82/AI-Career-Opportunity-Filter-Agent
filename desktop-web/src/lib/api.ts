@@ -17,7 +17,7 @@ export interface Opportunity {
   created_at: string;
 }
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-career-opportunity-filter-agent.onrender.com";
 
 // A wrapper for fetch that automatically adds auth headers and handles 401s
 export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
