@@ -6,6 +6,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception
 from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from langchain_google_genai.chat_models import GoogleAPIError
 from langchain_groq import ChatGroq
+import groq
 from groq import Groq
 
 def should_retry_exception(exception):
@@ -98,6 +99,8 @@ def extract_and_evaluate_opportunities(raw_text: str, link_dict: str, profile: d
     JSON Link Dictionary:
     {link_dict}
 
+    You must ALWAYS respond by calling the provided extraction tool. If no jobs match the strict filter criteria, you must call the tool with an empty array. NEVER output plain conversational text or explanations.
+
     INSTRUCTIONS:
     1. Extract up to 3 high-quality career opportunities found in the Raw Page Text.
     2. For EACH opportunity, select the exact Absolute Application URL from the 'JSON Link Dictionary'. This is mandatory.
@@ -170,6 +173,9 @@ def extract_and_evaluate_opportunities(raw_text: str, link_dict: str, profile: d
             # 3. Try Groq
             groq_result = fallbacks_structured[0].invoke(groq_prompt_value.to_messages())
             return groq_result.jobs
+        except groq.BadRequestError as bad_req_e:
+            print("[Warning] Groq refused tool call (likely 0 jobs found)")
+            return []
         except Exception as groq_e:
             print(f"\n[CRITICAL GROQ ERROR] Fallback failed: {str(groq_e)}\n")
             raise groq_e # Raise the actual Groq error so it's visible in the console
