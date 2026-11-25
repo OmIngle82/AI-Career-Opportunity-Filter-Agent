@@ -33,6 +33,12 @@ from scraper.ai_search_agent import run_agentic_search
 from scraper.telegram_listener import start_telegram_listener
 from scraper.exam_radar import run_exam_radar
 from scraper.link_resolver import resolve_opportunity_url
+from scraper.ats_poller import (
+    run_ats_poller_for_all_users,
+    poll_ats_sources_for_user,
+    test_ats_board,
+    parse_ats_url,
+)
 import asyncio
 from datetime import datetime, timezone, timedelta
 
@@ -49,6 +55,16 @@ def start_agentic_search_sync():
 
 def run_exam_radar_sync():
     asyncio.run(run_exam_radar())
+
+def run_ats_poller_sync():
+    asyncio.run(run_ats_poller_for_all_users())
+
+def run_ats_poller_for_user_sync(user_id: str):
+    supabase = get_db()
+    prof_res = supabase.table('user_profiles').select('*').eq('user_id', user_id).execute()
+    profile = prof_res.data[0] if prof_res.data else {}
+    schedule = (supabase.table('user_schedules').select('*').eq('user_id', user_id).execute()).data or []
+    asyncio.run(poll_ats_sources_for_user(supabase, user_id, profile, schedule))
 
 def run_telegram_outbox_retry_sweep():
     """Retries recent (24h) un-notified opportunities capped at 10 items per sweep."""
@@ -175,12 +191,14 @@ def check_scheduler_state(trigger_tasks=True, background_tasks: BackgroundTasks 
         needs_crawl = True
         needs_exam_radar = True
         needs_digest = True
+        needs_ats = True
         state = state_res.data[0] if (state_res and state_res.data) else {}
         
         last_sync = state.get('last_sync_timestamp')
         last_crawl = state.get('last_deep_crawl_timestamp')
         last_exam = state.get('last_exam_radar_timestamp')
         last_digest = state.get('last_digest_timestamp')
+        last_ats = state.get('last_ats_sync_timestamp')
         
         if last_sync:
             last_sync_time = datetime.fromisoformat(last_sync)
@@ -201,14 +219,20 @@ def check_scheduler_state(trigger_tasks=True, background_tasks: BackgroundTasks 
             last_digest_time = datetime.fromisoformat(last_digest)
             if (now - last_digest_time).total_seconds() < 24 * 3600:
                 needs_digest = False
+
+        if last_ats:
+            last_ats_time = datetime.fromisoformat(last_ats)
+            if (now - last_ats_time).total_seconds() < 6 * 3600:
+                needs_ats = False
         
-        if trigger_tasks and (needs_sync or needs_crawl or needs_exam_radar or needs_digest):
+        if trigger_tasks and (needs_sync or needs_crawl or needs_exam_radar or needs_digest or needs_ats):
             new_state = {
                 'id': 'singleton',
                 'last_sync_timestamp': now.isoformat() if needs_sync else last_sync,
                 'last_deep_crawl_timestamp': now.isoformat() if needs_crawl else last_crawl,
                 'last_exam_radar_timestamp': now.isoformat() if needs_exam_radar else last_exam,
                 'last_digest_timestamp': now.isoformat() if needs_digest else last_digest,
+                'last_ats_sync_timestamp': now.isoformat() if needs_ats else last_ats,
             }
             supabase.table('system_state').upsert(new_state).execute()
             
@@ -230,6 +254,12 @@ def check_scheduler_state(trigger_tasks=True, background_tasks: BackgroundTasks 
                     background_tasks.add_task(run_exam_radar_sync)
                 else:
                     asyncio.create_task(run_exam_radar())
+            if needs_ats:
+                print("[Scheduler] Triggering 6h Direct ATS Poller...")
+                if background_tasks:
+                    background_tasks.add_task(run_ats_poller_sync)
+                else:
+                    asyncio.create_task(run_ats_poller_for_all_users())
             if needs_digest:
                 if background_tasks:
                     background_tasks.add_task(run_morning_digest_sweep)
@@ -614,16 +644,39 @@ def health_check(background_tasks: BackgroundTasks):
 def create_source(source: SourceInput, current_user_id: str = Depends(get_current_user)):
     supabase = get_db()
     
+    detected_type = source.source_type
+    detected_tier = source.source_tier
+    if parse_ats_url(source.url_or_identifier):
+        detected_type = "ATS"
+        detected_tier = "TIER_1_TRUSTED"
+
     source_record = {
         'user_id': current_user_id,
         'name': source.name,
         'url_or_identifier': source.url_or_identifier,
-        'source_type': source.source_type,
-        'source_tier': source.source_tier
+        'source_type': detected_type,
+        'source_tier': detected_tier
     }
     
     db_result = supabase.table('sources').insert(source_record).execute()
     return {"message": "Source created successfully", "source": db_result.data[0]}
+
+class TestAtsInput(BaseModel):
+    url: str
+
+@app.post("/sources/test-ats")
+async def test_ats_source(input_data: TestAtsInput, current_user_id: str = Depends(get_current_user)):
+    try:
+        return await test_ats_board(input_data.url)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ATS test failed: {str(e)}")
+
+@app.post("/sync-ats")
+def sync_ats_sources(background_tasks: BackgroundTasks, current_user_id: str = Depends(get_current_user)):
+    background_tasks.add_task(run_ats_poller_for_user_sync, current_user_id)
+    return {"message": "Direct ATS sync started in background"}
 
 @app.get("/sources")
 def get_sources(current_user_id: str = Depends(get_current_user)):

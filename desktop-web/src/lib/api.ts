@@ -113,3 +113,49 @@ export async function generatePrepAnalysis(id: string): Promise<PrepAnalysis> {
   const data = await res.json();
   return data.prep;
 }
+
+export interface SourceItem {
+  id: string;
+  name: string;
+  url_or_identifier: string;
+  source_type: 'WEB' | 'TELEGRAM' | 'ATS';
+  source_tier: string;
+}
+
+export interface TestAtsResult {
+  platform: string;
+  company: string;
+  sample_count: number;
+  sample_titles: string[];
+}
+
+export async function fetchSources(): Promise<SourceItem[]> {
+  const res = await apiFetch(`/sources`);
+  if (!res.ok) throw new Error("Failed to fetch sources");
+  const data = await res.json();
+  return data.sources || [];
+}
+
+export async function deleteSource(id: string): Promise<void> {
+  const res = await apiFetch(`/sources/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete source");
+}
+
+export async function testAtsUrl(url: string): Promise<TestAtsResult> {
+  const res = await apiFetch(`/sources/test-ats`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to test ATS URL");
+  }
+  return res.json();
+}
+
+export async function syncAtsNow(): Promise<{ message: string }> {
+  const res = await apiFetch(`/sync-ats`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to start ATS sync");
+  return res.json();
+}

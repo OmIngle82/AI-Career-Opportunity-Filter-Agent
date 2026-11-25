@@ -83,7 +83,7 @@ CREATE TABLE public.sources (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     url_or_identifier TEXT NOT NULL,
-    source_type VARCHAR(50) CHECK (source_type IN ('WEB', 'TELEGRAM')),
+    source_type VARCHAR(50) CHECK (source_type IN ('WEB', 'TELEGRAM', 'ATS')),
     source_tier VARCHAR(50) CHECK (source_tier IN ('TIER_1_TRUSTED', 'TIER_2_GENERIC')),
     css_selector VARCHAR DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -105,6 +105,7 @@ CREATE TABLE public.system_state (
     last_deep_crawl_timestamp TIMESTAMP WITH TIME ZONE,
     last_exam_radar_timestamp TIMESTAMPTZ,
     last_digest_timestamp TIMESTAMPTZ,
+    last_ats_sync_timestamp TIMESTAMPTZ,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
