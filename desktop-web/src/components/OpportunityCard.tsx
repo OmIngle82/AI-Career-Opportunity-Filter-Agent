@@ -364,71 +364,75 @@ export default function OpportunityCard({ opportunity, onStatusChange }: Props) 
       <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-3">
 
         {/* Quick ATS Status Actions */}
-        <div className="grid grid-cols-5 sm:flex sm:items-center sm:justify-between gap-1 bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
-          <button
-            onClick={() => handleStatusUpdate('SAVED')}
-            disabled={isUpdatingStatus}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1 px-1 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all ${currentStatus === 'SAVED'
-              ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
-              }`}
-            title="Bookmark / Save opportunity"
-          >
-            <Bookmark className={`w-3.5 h-3.5 ${currentStatus === 'SAVED' ? 'fill-current' : ''}`} />
-            <span>Save</span>
-          </button>
+        <div className="flex flex-col gap-1.5 bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              onClick={() => handleStatusUpdate('SAVED')}
+              disabled={isUpdatingStatus}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all min-w-0 ${currentStatus === 'SAVED'
+                ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+              title="Bookmark / Save opportunity"
+            >
+              <Bookmark className={`w-3.5 h-3.5 shrink-0 ${currentStatus === 'SAVED' ? 'fill-current' : ''}`} />
+              <span className="truncate">Save</span>
+            </button>
 
-          <button
-            onClick={() => handleStatusUpdate('APPLIED')}
-            disabled={isUpdatingStatus}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1 px-1 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all ${currentStatus === 'APPLIED'
-              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
-              }`}
-            title="Mark as Applied"
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>Applied</span>
-          </button>
+            <button
+              onClick={() => handleStatusUpdate('APPLIED')}
+              disabled={isUpdatingStatus}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all min-w-0 ${currentStatus === 'APPLIED'
+                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+              title="Mark as Applied"
+            >
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Applied</span>
+            </button>
 
-          <button
-            onClick={() => handleStatusUpdate('DISMISSED')}
-            disabled={isUpdatingStatus}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1 px-1 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all ${currentStatus === 'DISMISSED'
-              ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
-              }`}
-            title="Dismiss / Archive opportunity"
-          >
-            <Archive className="w-3.5 h-3.5" />
-            <span>Dismiss</span>
-          </button>
+            <button
+              onClick={() => handleStatusUpdate('DISMISSED')}
+              disabled={isUpdatingStatus}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all min-w-0 ${currentStatus === 'DISMISSED'
+                ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+              title="Dismiss / Archive opportunity"
+            >
+              <Archive className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Dismiss</span>
+            </button>
+          </div>
 
-          {/* Prep & Skill-Gap Trigger */}
-          <button
-            onClick={handleGeneratePrep}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1 px-1 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all sm:ml-auto ${showPrep
-              ? 'bg-emerald-600 text-white'
-              : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
-              }`}
-            title="Prep & Skill-Gap analysis"
-          >
-            <GraduationCap className="w-3.5 h-3.5" />
-            <span>Prep</span>
-          </button>
+          <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+            {/* Prep & Skill-Gap Trigger */}
+            <button
+              onClick={handleGeneratePrep}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all min-w-0 ${showPrep
+                ? 'bg-emerald-600 text-white'
+                : 'text-emerald-700 dark:text-emerald-400 bg-white/70 dark:bg-slate-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40'
+                }`}
+              title="Prep & Skill-Gap analysis"
+            >
+              <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Prep &amp; Gap</span>
+            </button>
 
-          {/* AI Pitch Trigger */}
-          <button
-            onClick={handleGeneratePitch}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1 px-1 sm:px-2.5 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all ${showPitch
-              ? 'bg-indigo-600 text-white'
-              : 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'
-              }`}
-            title="Generate AI tailored recruiter cold pitch"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Outreach</span>
-          </button>
+            {/* AI Pitch Trigger */}
+            <button
+              onClick={handleGeneratePitch}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all min-w-0 ${showPitch
+                ? 'bg-indigo-600 text-white'
+                : 'text-indigo-600 dark:text-indigo-400 bg-white/70 dark:bg-slate-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/40'
+                }`}
+              title="Generate AI tailored recruiter cold pitch"
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Outreach</span>
+            </button>
+          </div>
         </div>
 
         {/* Footer Meta & Apply Button */}
