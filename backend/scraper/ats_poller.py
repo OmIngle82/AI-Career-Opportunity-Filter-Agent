@@ -150,7 +150,13 @@ async def fetch_workday_jobs(
     batch_urls = set()
 
     try:
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Origin": f"https://{host}",
+            "Referer": f"https://{host}/{site}",
+        }
         for query in search_queries[:3]:
             payload = {
                 "limit": 20,  # Mandatory Workday cap: never > 20
@@ -160,7 +166,7 @@ async def fetch_workday_jobs(
             }
             try:
                 resp = await client.post(list_url, json=payload, headers=headers)
-                if resp.status_code in (401, 403, 404, 422):
+                if resp.status_code in (401, 403, 404, 422, 429):
                     print(f"[ATS Workday] Tenant {tenant}/{site} returned HTTP {resp.status_code} on list. Skipping.")
                     break
                 resp.raise_for_status()
