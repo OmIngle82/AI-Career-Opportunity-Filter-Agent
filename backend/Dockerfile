@@ -9,8 +9,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Playwright needs system dependencies. --with-deps handles the OS-level lifting on Debian-slim.
-RUN playwright install --with-deps chromium
+# Playwright needs libatomic1 to launch its bundled Node CLI before --with-deps installs browser OS deps.
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/* \
+    && playwright install --with-deps chromium
 
 # Copy the rest of the application
 COPY . .
