@@ -17,6 +17,15 @@ class UserProfile(BaseModel):
     form_preferences: Optional[dict] = None
     ai_filter_directive: Optional[str] = None
 
+    # Student-First V3 fields
+    graduation_batch: Optional[str] = None
+    degree_branch: Optional[str] = None
+    experience_level: Optional[str] = None
+    target_exam_tracks: Optional[List[str]] = None
+    telegram_chat_id: Optional[str] = None
+    min_alert_score: Optional[int] = 60
+    daily_digest_enabled: Optional[bool] = True
+
 class FormPreferences(BaseModel):
     roles: Optional[str] = None
     tech_stack: Optional[str] = None
@@ -25,6 +34,10 @@ class FormPreferences(BaseModel):
     min_salary: Optional[str] = None
     active_commitments: Optional[str] = None
     target_exams: Optional[str] = None
+    graduation_batch: Optional[str] = None
+    degree_branch: Optional[str] = None
+    experience_level: Optional[str] = None
+    target_exam_tracks: Optional[List[str]] = None
 
 class ProfileSynthesis(BaseModel):
     summary: List[str] = Field(description="A concise human-readable summary of the user's career profile, returned as exactly 3 distinct strings/paragraphs.")
@@ -57,9 +70,21 @@ class OpportunityEvaluation(BaseModel):
     credibility_flags: List[str] = Field(description="A list of red flags or green flags regarding the domain and legitimacy.")
     pros: List[str] = Field(description="A list of pros for this opportunity based on user goals.")
     cons: List[str] = Field(description="A list of cons for this opportunity based on user goals.")
+    eligible_batches: Optional[List[str]] = Field(default=None, description="Eligible graduation years e.g. ['2026', '2027'] or ['Any'], or null if unspecified.")
+    min_experience_years: Optional[int] = Field(default=None, description="Minimum years of experience required (0 for student/intern/fresher), or null if unspecified.")
+    stipend_or_ctc: Optional[str] = Field(default=None, description="Stipend or CTC if stated (e.g. '45k/month' or '12 LPA'), else null.")
+    application_deadline: Optional[str] = Field(default=None, description="Last date to apply in YYYY-MM-DD format if stated, else null.")
+    exam_date: Optional[str] = Field(default=None, description="Exam or event date in YYYY-MM-DD format if stated, else null.")
+    is_official_source: Optional[bool] = Field(default=False, description="True if apply_url or source is an official company career portal, .gov.in, .nic.in, or .ac.in.")
 
 class OpportunityEvaluations(BaseModel):
     jobs: List[OpportunityEvaluation] = Field(description="List of evaluated jobs, up to 3 max.")
+
+class PrepAnalysis(BaseModel):
+    matching_strengths: List[str] = Field(description="2 to 3 specific strengths/projects from the student's resume that align with this opportunity.")
+    missing_skills_or_topics: List[str] = Field(description="2 to 3 missing skills, keywords, or syllabus topics to brush up on before applying.")
+    prep_checklist: List[str] = Field(description="3 actionable preparation steps tailored to this role or exam.")
+    estimated_prep_focus: str = Field(description="A concise 1-sentence summary of what to prioritize.")
 
 class SourceInput(BaseModel):
     name: str

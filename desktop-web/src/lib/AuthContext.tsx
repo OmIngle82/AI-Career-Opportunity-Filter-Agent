@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUsername = localStorage.getItem("username");
     
     if (storedToken && storedUsername) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToken(storedToken);
       setUsername(storedUsername);
     }

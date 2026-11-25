@@ -9,15 +9,59 @@ from telethon.tl.types import MessageEntityTextUrl, MessageEntityUrl
 from supabase import create_client
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from services import extract_and_evaluate_opportunities
-from notifier import send_whatsapp_alert
+from notifier import notify_new_opportunity_sync
+from link_resolver import resolve_opportunity_url
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 API_ID = os.environ.get("TELEGRAM_API_ID")
 API_HASH = os.environ.get("TELEGRAM_API_HASH")
 
+# Default seed channels kept for migration scripts and backward compatibility
+TARGET_CHANNELS = [
+    'https://t.me/jobsinternshipswale',
+    'https://t.me/goyalarsh',
+    'https://t.me/jobs_and_internships_updates',
+    'https://t.me/internfreak',
+    't.me/offcampusjobs4u',
+]
 
+import re
+import urllib.request
+from urllib.parse import urlparse
+
+CAREER_KEYWORDS = [
+    r'\bhiring\b', r'\bintern(ship)?\b', r'\bjob(s)?\b', r'\bopening(s)?\b',
+    r'\bvacancy\b', r'\bvacancies\b', r'\brole(s)?\b', r'\bapply\b',
+    r'\bcareer(s)?\b', r'\bstipend\b', r'\bsalary\b', r'\bctc\b', r'\blpa\b',
+    r'\bbatch(es)?\b', r'\beligib(ility|le)\b', r'\bgraduate\b', r'\bfresher(s)?\b',
+    r'\bwalk-?in\b', r'\brecruit(ment|ing)?\b', r'\breferral\b', r'\bdeveloper\b',
+    r'\bengineer\b', r'\banalyst\b', r'\bexam\b', r'\bnotification\b', r'\bhackathon\b'
+]
+CAREER_REGEX = re.compile('|'.join(CAREER_KEYWORDS), re.IGNORECASE)
+
+def is_career_relevant(text: str) -> bool:
+    if not text or len(text.strip()) < 20:
+        return False
+    return bool(CAREER_REGEX.search(text))
+
+SHORTENER_DOMAINS = {'bit.ly', 'tinyurl.com', 'cutt.ly', 'rb.gy', 't.co', 'goo.gl', 'shorturl.at', 'rebrand.ly'}
+
+def resolve_canonical_url(url: str, timeout: float = 3.5) -> str:
+    if not url or not (url.startswith('http://') or url.startswith('https://')):
+        return url
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        if any(short in domain for short in SHORTENER_DOMAINS):
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}, method='HEAD')
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return response.geturl() or url
+    except Exception:
+        pass
+    return url
 
 def get_db():
     supabase_url = os.environ.get("SUPABASE_URL")
@@ -25,6 +69,11 @@ def get_db():
     return create_client(supabase_url, supabase_key)
 
 def process_telegram_message(message_text, link_dict, source_name, source_identifier):
+    # Pre-LLM Heuristic: filter non-career messages, spam, and channel promotions
+    if not is_career_relevant(message_text):
+        print(f"[Heuristic Filter] Message from {source_name} has no career signals. Skipping LLM.")
+        return
+
     print(f"Processing new Telegram message from {source_name} ({source_identifier})...")
     db = get_db()
     
@@ -64,6 +113,12 @@ def process_telegram_message(message_text, link_dict, source_name, source_identi
             print(f"Gemini returned {len(evaluated_jobs)} evaluated opportunities for user {user_id}.")
             
             for eval_job in evaluated_jobs:
+                is_official = bool(eval_job.is_official_source)
+                if eval_job.apply_url:
+                    resolved_url, detected_official = resolve_opportunity_url(eval_job.apply_url)
+                    eval_job.apply_url = resolved_url
+                    is_official = is_official or detected_official
+
                 if eval_job.tags is None:
                     eval_job.tags = []
                 if "Telegram ✈️" not in eval_job.tags:
@@ -86,9 +141,16 @@ def process_telegram_message(message_text, link_dict, source_name, source_identi
                     'cons': eval_job.cons,
                     'raw_text': f"Extracted via {source_name} (Telegram)",
                     'source_name': f"Telegram: {source_name}",
-                    'source_tier': "TIER_1_TRUSTED",  # Treat Telegram groups as direct trusted sources by default
+                    'source_tier': "TIER_1_TRUSTED",
                     'category': eval_job.category,
-                    'tags': eval_job.tags
+                    'tags': eval_job.tags,
+                    'status': 'INBOX',
+                    'eligible_batches': eval_job.eligible_batches,
+                    'stipend_or_ctc': eval_job.stipend_or_ctc,
+                    'application_deadline': eval_job.application_deadline,
+                    'exam_date': eval_job.exam_date,
+                    'is_official_source': is_official,
+                    'telegram_notified': False,
                 }
                 
                 is_duplicate = False
@@ -107,16 +169,11 @@ def process_telegram_message(message_text, link_dict, source_name, source_identi
                 
                 # Step 3: Insert or Skip
                 if not is_duplicate:
-                    db.table('opportunities').insert(opportunity_record).execute()
+                    ins = db.table('opportunities').insert(opportunity_record).execute()
+                    if ins.data:
+                        opportunity_record['id'] = ins.data[0]['id']
                     print(f"Successfully inserted Telegram Job '{eval_job.title}' for user {user_id}.")
-                    
-                    try:
-                        score_val = int(float(eval_job.match_score))
-                    except (ValueError, TypeError):
-                        score_val = 0
-                        
-                    if score_val >= 85:
-                        send_whatsapp_alert(opportunity_record)
+                    notify_new_opportunity_sync(db, opportunity_record, profile)
                 else:
                     print(f"Job '{eval_job.title}' at '{eval_job.company}' already exists for user {user_id}. Skipping duplicate.")
                     
@@ -177,8 +234,10 @@ async def start_telegram_listener():
         source_name = "Unknown Channel"
         source_identifier = "Unknown"
         if event.chat:
-            source_name = getattr(event.chat, 'title', getattr(event.chat, 'username', 'Unknown Channel'))
-            source_identifier = getattr(event.chat, 'username', source_name)
+            chat_title = getattr(event.chat, 'title', None)
+            chat_username = getattr(event.chat, 'username', None)
+            source_name = chat_title or chat_username or "Unknown Channel"
+            source_identifier = chat_username or chat_title or "Unknown"
             
         # Extract links
         link_dict = {}
@@ -196,3 +255,8 @@ async def start_telegram_listener():
         
     # Wait until disconnected
     await client.run_until_disconnected()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(start_telegram_listener())
+

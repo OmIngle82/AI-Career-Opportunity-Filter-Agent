@@ -24,6 +24,15 @@ CREATE TABLE user_profiles (
     raw_resume_text TEXT,
     form_preferences JSONB,
     ai_filter_directive TEXT,
+
+    -- Student-First V3 Columns
+    graduation_batch TEXT,
+    degree_branch TEXT,
+    experience_level TEXT,
+    target_exam_tracks TEXT[],
+    telegram_chat_id TEXT,
+    min_alert_score INTEGER DEFAULT 60,
+    daily_digest_enabled BOOLEAN DEFAULT TRUE,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -56,6 +65,16 @@ CREATE TABLE opportunities (
     raw_text TEXT NOT NULL,
     source_name VARCHAR(255),
     source_tier VARCHAR(50) CHECK (source_tier IN ('TIER_1_TRUSTED', 'TIER_2_GENERIC')),
+    status VARCHAR(50) DEFAULT 'INBOX',
+    cold_outreach_draft TEXT,
+    telegram_notified BOOLEAN DEFAULT FALSE,
+    deadline_reminded BOOLEAN DEFAULT FALSE,
+    application_deadline TIMESTAMPTZ,
+    exam_date TIMESTAMPTZ,
+    stipend_or_ctc TEXT,
+    eligible_batches TEXT[],
+    is_official_source BOOLEAN DEFAULT FALSE,
+    prep_analysis JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -84,6 +103,24 @@ CREATE TABLE public.system_state (
     id VARCHAR(255) PRIMARY KEY DEFAULT 'singleton',
     last_sync_timestamp TIMESTAMP WITH TIME ZONE,
     last_deep_crawl_timestamp TIMESTAMP WITH TIME ZONE,
+    last_exam_radar_timestamp TIMESTAMPTZ,
+    last_digest_timestamp TIMESTAMPTZ,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Phase 3.8: Automatic Opportunity Retention Policy (30-day Purge)
+CREATE OR REPLACE FUNCTION delete_expired_opportunities(retention_days INT DEFAULT 30)
+RETURNS INT AS $$
+DECLARE
+    deleted_count INT;
+BEGIN
+    DELETE FROM public.opportunities
+    WHERE created_at < (timezone('utc'::text, now()) - (retention_days || ' days')::INTERVAL);
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Optional: If pg_cron extension is enabled on Supabase, schedule it daily at 03:00 UTC:
+-- SELECT cron.schedule('purge-expired-opportunities', '0 3 * * *', 'SELECT delete_expired_opportunities(30);');

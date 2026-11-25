@@ -10,17 +10,25 @@ import sys
 
 # Ensure backend path is available
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from services import extract_and_evaluate_opportunities
-from notifier import send_whatsapp_alert
+from notifier import async_notify_new_opportunity
+from link_resolver import resolve_opportunity_url
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 def get_db():
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
     return create_client(supabase_url, supabase_key)
 
-async def scrape_and_evaluate_url(page, url: str, source_name: str, source_tier: str, profile: dict, schedule: list):
+async def scrape_and_evaluate_url(page, url: str, source_name: str, source_tier: str, profile: dict, schedule: list, user_id: str = None):
+    if not user_id:
+        user_id = profile.get('user_id')
+    if not user_id:
+        print(f"No user_id found for evaluation of {source_name}. Skipping.")
+        return
+
     print(f"\nNavigating to {source_name} ({url})...", flush=True)
     try:
         await page.goto(url, wait_until='domcontentloaded', timeout=15000)
@@ -83,6 +91,7 @@ async def scrape_and_evaluate_url(page, url: str, source_name: str, source_tier:
                 eval_job.match_score = min(100, eval_job.match_score + 10)
                 
             opportunity_record = {
+                'user_id': user_id,
                 'title': eval_job.title,
                 'company': eval_job.company,
                 'description': eval_job.description,
@@ -100,42 +109,50 @@ async def scrape_and_evaluate_url(page, url: str, source_name: str, source_tier:
                 'source_name': source_name,
                 'source_tier': source_tier,
                 'category': eval_job.category,
-                'tags': eval_job.tags
+                'tags': eval_job.tags,
+                'status': 'INBOX',
+                'eligible_batches': eval_job.eligible_batches,
+                'stipend_or_ctc': eval_job.stipend_or_ctc,
+                'application_deadline': eval_job.application_deadline,
+                'exam_date': eval_job.exam_date,
+                'is_official_source': bool(eval_job.is_official_source),
+                'telegram_notified': False,
             }
             
             if eval_job.apply_url and eval_job.apply_url.strip() and not eval_job.apply_url.startswith('javascript:'):
-                opportunity_record['apply_url'] = urljoin(actual_url, eval_job.apply_url)
+                raw_apply = urljoin(actual_url, eval_job.apply_url)
+                resolved_apply, detected_official = await asyncio.to_thread(resolve_opportunity_url, raw_apply)
+                opportunity_record['apply_url'] = resolved_apply
+                opportunity_record['is_official_source'] = bool(opportunity_record['is_official_source'] or detected_official)
             elif opportunity_record.get('apply_url'):
-                # clear invalid javascript links or bare hashes if somehow returned
-                opportunity_record['apply_url'] = urljoin(actual_url, opportunity_record['apply_url'])
+                raw_apply = urljoin(actual_url, opportunity_record['apply_url'])
+                resolved_apply, detected_official = await asyncio.to_thread(resolve_opportunity_url, raw_apply)
+                opportunity_record['apply_url'] = resolved_apply
+                opportunity_record['is_official_source'] = bool(opportunity_record['is_official_source'] or detected_official)
                 
             is_duplicate = False
             
             # Step 1: Check by apply_url (if it exists)
             if opportunity_record['apply_url']:
-                existing_url = db.table('opportunities').select('id').eq('apply_url', opportunity_record['apply_url']).execute()
+                existing_url = db.table('opportunities').select('id').eq('user_id', user_id).eq('apply_url', opportunity_record['apply_url']).execute()
                 if existing_url.data:
                     is_duplicate = True
             
             # Step 2: Check by Title + Company (Fallback)
             if not is_duplicate:
-                existing_tc = db.table('opportunities').select('id').eq('title', eval_job.title).eq('company', eval_job.company).execute()
+                existing_tc = db.table('opportunities').select('id').eq('user_id', user_id).eq('title', eval_job.title).eq('company', eval_job.company).execute()
                 if existing_tc.data:
                     is_duplicate = True
             
             # Step 3: Insert or Skip
             if not is_duplicate:
-                db.table('opportunities').insert(opportunity_record).execute()
-                print(f"Successfully inserted '{eval_job.title}'.")
-                
-                if int(float(eval_job.match_score)) >= 85:
-                    try:
-                        # Ensure the job data is formatted as a dictionary before sending
-                        send_whatsapp_alert(eval_job.model_dump() if hasattr(eval_job, 'model_dump') else eval_job)
-                    except Exception as e:
-                        print(f"[WhatsApp Deep Crawl Error] {e}")
+                ins = db.table('opportunities').insert(opportunity_record).execute()
+                if ins.data:
+                    opportunity_record['id'] = ins.data[0]['id']
+                print(f"Successfully inserted '{eval_job.title}' for user {user_id}.")
+                await async_notify_new_opportunity(db, opportunity_record, profile)
             else:
-                print(f"Job '{eval_job.title}' at '{eval_job.company}' already exists. Skipping duplicate.")
+                print(f"Job '{eval_job.title}' at '{eval_job.company}' already exists for user {user_id}. Skipping duplicate.")
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -183,7 +200,8 @@ async def run_scrapers():
                     source_name=source['name'], 
                     source_tier=source['source_tier'],
                     profile=profile,
-                    schedule=schedule
+                    schedule=schedule,
+                    user_id=user_id
                 )
                 await asyncio.sleep(2.5) # Throttle loop
 

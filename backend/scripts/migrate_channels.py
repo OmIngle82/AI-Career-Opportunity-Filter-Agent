@@ -5,8 +5,13 @@ from urllib.parse import urlparse
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from backend.scraper.telegram_listener import TARGET_CHANNELS
+
+try:
+    from scraper.telegram_listener import TARGET_CHANNELS
+except ImportError:
+    from backend.scraper.telegram_listener import TARGET_CHANNELS
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 

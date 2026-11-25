@@ -8,7 +8,12 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from supabase import create_client
 from tenacity import retry, stop_after_attempt, wait_exponential
 from playwright.async_api import async_playwright
+from dotenv import load_dotenv
 import sys
+
+# Ensure backend path is in sys.path and load environment variables
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 # Ensure scraper is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -124,7 +129,8 @@ async def run_agentic_search():
                             source_name=f"Agentic Search: {query}",
                             source_tier="TIER_2_GENERIC",
                             profile=profile,
-                            schedule=schedule
+                            schedule=schedule,
+                            user_id=user_id
                         )
                     except Exception as e:
                         print(f"Deep crawl failed for {url}: {e}")

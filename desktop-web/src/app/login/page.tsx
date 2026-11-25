@@ -36,8 +36,9 @@ export default function LoginPage() {
       const data = await res.json();
       login(data.access_token, username);
       toast.success("Welcome back!");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,7 @@ export default function LoginPage() {
           </div>
           
           <div className="text-center text-sm text-slate-600 dark:text-slate-400">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
               Register here
             </Link>

@@ -18,6 +18,13 @@ export default function ProfilePage() {
     active_commitments: "",
     target_exams: ""
   });
+  const [graduationBatch, setGraduationBatch] = useState("2027");
+  const [degreeBranch, setDegreeBranch] = useState("B.E. IT/CS");
+  const [experienceLevel, setExperienceLevel] = useState("Student / Fresher (0-1 yr)");
+  const [targetExamTracks, setTargetExamTracks] = useState<string[]>(["GATE", "TCS NQT", "ISRO / DRDO / BARC"]);
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [minAlertScore, setMinAlertScore] = useState(60);
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
   const [rawResumeText, setRawResumeText] = useState("");
   
   const [loading, setLoading] = useState(true);
@@ -35,10 +42,6 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
   const loadProfile = async () => {
     try {
       const res = await apiFetch(`/profile`);
@@ -47,6 +50,13 @@ export default function ProfilePage() {
         setPreferences(data.form_preferences || {
           roles: "", tech_stack: "", locations: "", work_modes: "", min_salary: "", active_commitments: "", target_exams: ""
         });
+        setGraduationBatch(data.graduation_batch || "2027");
+        setDegreeBranch(data.degree_branch || "B.E. IT/CS");
+        setExperienceLevel(data.experience_level || "Student / Fresher (0-1 yr)");
+        setTargetExamTracks(Array.isArray(data.target_exam_tracks) && data.target_exam_tracks.length > 0 ? data.target_exam_tracks : ["GATE", "TCS NQT"]);
+        setTelegramChatId(data.telegram_chat_id || "");
+        setMinAlertScore(typeof data.min_alert_score === "number" ? data.min_alert_score : 60);
+        setDailyDigestEnabled(typeof data.daily_digest_enabled === "boolean" ? data.daily_digest_enabled : true);
         setRawResumeText(data.raw_resume_text || "");
         if (data.ai_filter_directive) {
           setSynthesis({ summary: data.summary, directive: data.ai_filter_directive });
@@ -58,6 +68,11 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadProfile();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -97,7 +112,16 @@ export default function ProfilePage() {
       const res = await apiFetch(`/profile/synthesize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences, resume_text: rawResumeText })
+        body: JSON.stringify({
+          preferences: {
+            ...preferences,
+            graduation_batch: graduationBatch,
+            degree_branch: degreeBranch,
+            experience_level: experienceLevel,
+            target_exam_tracks: targetExamTracks,
+          },
+          resume_text: rawResumeText
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -153,7 +177,14 @@ export default function ProfilePage() {
         body: JSON.stringify({
           form_preferences: preferences,
           raw_resume_text: rawResumeText,
-          ai_filter_directive: synthesis.directive
+          ai_filter_directive: synthesis.directive,
+          graduation_batch: graduationBatch,
+          degree_branch: degreeBranch,
+          experience_level: experienceLevel,
+          target_exam_tracks: targetExamTracks,
+          telegram_chat_id: telegramChatId,
+          min_alert_score: minAlertScore,
+          daily_digest_enabled: dailyDigestEnabled,
         })
       });
       if (res.ok) {
@@ -186,10 +217,10 @@ export default function ProfilePage() {
             </Link>
             <span className="font-semibold text-slate-900 dark:text-slate-100 tracking-tight">AI Persona Compiler</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <div className="hidden md:flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-3">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-2 sm:pl-3">
+              <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-300">
                 {username}
               </span>
               <button
@@ -210,7 +241,83 @@ export default function ProfilePage() {
           <p className="text-slate-500 dark:text-slate-400">Define your precise constraints. Gemini Flash will compile these into a strict directive.</p>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
+          {/* Student Eligibility & Exam Radar */}
+          <section className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Student Eligibility &amp; Exam Radar</h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-5">Used to automatically reject wrong graduation batches &amp; 2+ yr senior roles.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Graduation Batch</label>
+                <select value={graduationBatch} onChange={(e) => setGraduationBatch(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm text-slate-900 dark:text-slate-100">
+                  {["2025", "2026", "2027", "2028", "2029"].map((yr) => (
+                    <option key={yr} value={yr}>{yr} Batch</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Degree &amp; Branch</label>
+                <input type="text" value={degreeBranch} onChange={(e) => setDegreeBranch(e.target.value)} className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm text-slate-900 dark:text-slate-100" placeholder="e.g. B.E. IT/CS" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Experience Level</label>
+                <select value={experienceLevel} onChange={(e) => setExperienceLevel(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm text-slate-900 dark:text-slate-100">
+                  <option value="Student / Fresher (0-1 yr)">Student / Fresher (0-1 yr)</option>
+                  <option value="Internship Only">Internship Only</option>
+                  <option value="0-2 Years">0-2 Years</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Target Exam &amp; Drive Tracks</label>
+              <div className="flex flex-wrap gap-2">
+                {["GATE", "TCS NQT", "ISRO / DRDO / BARC", "NIC / NIELIT", "Infosys HackWithInfy", "Off-Campus Hackathons"].map((track) => {
+                  const selected = targetExamTracks.includes(track);
+                  return (
+                    <button
+                      type="button"
+                      key={track}
+                      onClick={() =>
+                        setTargetExamTracks((prev) =>
+                          prev.includes(track) ? prev.filter((t) => t !== track) : [...prev, track]
+                        )
+                      }
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                        selected
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                          : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {track}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Telegram Chat ID</label>
+                <input type="text" value={telegramChatId} onChange={(e) => setTelegramChatId(e.target.value)} className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm text-slate-900 dark:text-slate-100" placeholder="e.g. 1220500210" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Min Telegram Alert Score</label>
+                <select value={minAlertScore} onChange={(e) => setMinAlertScore(Number(e.target.value))} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm text-slate-900 dark:text-slate-100">
+                  <option value={50}>50+ (Broad)</option>
+                  <option value={60}>60+ (Recommended)</option>
+                  <option value={75}>75+ (High Match Only)</option>
+                </select>
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="inline-flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <input type="checkbox" checked={dailyDigestEnabled} onChange={(e) => setDailyDigestEnabled(e.target.checked)} className="w-4 h-4 rounded text-indigo-600" />
+                  Daily Morning Digest
+                </label>
+              </div>
+            </div>
+          </section>
+
           {/* Career & Roles */}
           <section className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-6">Career & Roles</h2>
@@ -263,7 +370,7 @@ export default function ProfilePage() {
           {/* Resume Upload */}
           <section className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">Resume Context</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Upload your PDF resume. We'll parse it so the AI knows exactly what you've done.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Upload your PDF resume. We&apos;ll parse it so the AI knows exactly what you&apos;ve done.</p>
             
             <div 
               className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50 dark:bg-slate-800/50 mb-6"
@@ -305,52 +412,52 @@ export default function ProfilePage() {
           
           <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {isSynthesizing ? (
-              <div className="flex flex-col items-center justify-center p-20 text-indigo-500">
-                <Bot className="w-16 h-16 mb-6 animate-pulse" />
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Compiling Persona</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-center max-w-md">Gemini Flash is analyzing your preferences and resume to build a strict filtering directive...</p>
+              <div className="flex flex-col items-center justify-center p-8 sm:p-20 text-indigo-500">
+                <Bot className="w-12 h-12 sm:w-16 sm:h-16 mb-4 sm:mb-6 animate-pulse" />
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2 text-center">Compiling Persona</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-center text-sm max-w-md">Gemini Flash is analyzing your preferences and resume to build a strict filtering directive...</p>
               </div>
             ) : (
               <>
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Bot className="w-5 h-5 text-indigo-500" />
                     AI Persona Compiled
                   </h3>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
                   <div>
-                    <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wider">Human Summary</h4>
-                    <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-4 text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+                    <h4 className="text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wider">Human Summary</h4>
+                    <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3.5 sm:p-4 text-slate-700 dark:text-slate-300 text-xs sm:text-sm leading-relaxed">
                       {Array.isArray(synthesis.summary) ? synthesis.summary.map((para, i) => (
-                        <p key={i} className="mb-4 last:mb-0">{para}</p>
+                        <p key={i} className="mb-3 last:mb-0">{para}</p>
                       )) : <p>{synthesis.summary}</p>}
                     </div>
                   </div>
                   
                   <div>
-                    <h4 className="text-sm font-semibold text-rose-600 dark:text-rose-400 mb-2 uppercase tracking-wider">Strict AI Directive</h4>
-                    <div className="bg-slate-50 dark:bg-slate-950 border border-rose-200 dark:border-rose-900/30 rounded-lg p-4 text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
+                    <h4 className="text-xs sm:text-sm font-semibold text-rose-600 dark:text-rose-400 mb-2 uppercase tracking-wider">Strict AI Directive</h4>
+                    <div className="bg-slate-50 dark:bg-slate-950 border border-rose-200 dark:border-rose-900/30 rounded-lg p-3.5 sm:p-4 text-slate-700 dark:text-slate-300 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-mono">
                       {synthesis.directive}
                     </div>
                   </div>
                 </div>
 
-                <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                  <div className="flex gap-3 mb-4">
+                <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4">
                     <input 
                       type="text" 
                       value={feedback}
                       onChange={e => setFeedback(e.target.value)}
-                      placeholder="Make an adjustment... (e.g. 'Allow entry-level roles too')"
-                      className="flex-1 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                      placeholder="Make an adjustment... (e.g. 'Allow entry-level roles')"
+                      className="flex-1 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 sm:px-4 py-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       onKeyDown={e => e.key === 'Enter' && handleRefine()}
                     />
                     <button 
                       onClick={handleRefine}
                       disabled={isRefining || !feedback.trim()}
-                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium border border-slate-300 dark:border-slate-700"
+                      className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium border border-slate-300 dark:border-slate-700"
                     >
                       {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       Refine

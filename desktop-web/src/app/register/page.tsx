@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/lib/AuthContext";
 import { API_BASE_URL } from "@/lib/api";
 import { Bot, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -32,8 +31,9 @@ export default function RegisterPage() {
 
       toast.success("Account created successfully! Please sign in.");
       router.push("/login");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Registration failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
